@@ -86,7 +86,6 @@ async function saveProgress(completed = false) {
 async function bootAdmin() {
   if (!(await authenticatedPage())) return;
   if (me.role === "student") { location.href = "/static/home.html"; return; }
-  document.querySelector("#new-course").onclick = createCourse;
   await loadAdmin();
 }
 
@@ -98,11 +97,33 @@ async function loadAdmin() {
   document.querySelectorAll("[data-grant]").forEach((node) => node.onclick = () => grant(Number(node.dataset.grant), courses));
 }
 
-async function createCourse() { const title = prompt("课程名称："); if (!title) return; const description = prompt("课程简介：") || "暂无简介"; const teacher = prompt("讲师：", "平台讲师") || "平台讲师"; try { await api("/api/admin/courses", {method: "POST", body: JSON.stringify({title, description, teacher})}); await loadAdmin(); } catch (error) { alert(error.message); } }
 async function addChapter(courseId) { const title = prompt(`课程 ${courseId} 的章节名称：`); if (!title) return; try { const chapter = await api(`/api/admin/courses/${courseId}/chapters`, {method: "POST", body: JSON.stringify({title})}); await loadAdmin(); alert(`章节已创建，章节 ID：${chapter.id}`); } catch (error) { alert(error.message); } }
 async function addLesson(courseId) { try { const course = await api(`/api/courses/${courseId}`); const choices = course.chapters.map((chapter) => `${chapter.id}：${chapter.title}`).join("\n"); if (!choices) return alert("请先创建章节"); const chapterId = prompt(`输入章节 ID：\n${choices}`); if (!chapterId) return; const title = prompt("课时名称："); const duration = prompt("视频时长（秒），例如 600：", "600"); if (!title || !duration) return; const lesson = await api(`/api/admin/chapters/${chapterId}/lessons`, {method: "POST", body: JSON.stringify({title, duration: Number(duration), is_preview: confirm("是否允许试听？")})}); await loadAdmin(); alert(`课时已创建，课时 ID：${lesson.id}`); } catch (error) { alert(error.message); } }
 async function uploadVideo(courseId) { try { const course = await api(`/api/courses/${courseId}`); const choices = course.chapters.flatMap((chapter) => chapter.lessons.map((lesson) => `${lesson.id}：${lesson.title}${lesson.original_filename ? "（已上传）" : ""}`)).join("\n"); if (!choices) return alert("请先创建课时"); const lessonId = prompt(`输入课时 ID：\n${choices}`); if (!lessonId) return; const input = Object.assign(document.createElement("input"), {type: "file", accept: "video/mp4,.mp4"}); input.onchange = async () => { const file = input.files[0]; if (!file) return; if (file.size > 1024 * 1024 * 1024) return alert("视频不能超过 1 GB"); const form = new FormData(); form.append("file", file); try { const response = await fetch(`/api/admin/lessons/${lessonId}/video`, {method: "POST", headers: {Authorization: `Bearer ${token}`}, body: form}); const data = await response.json(); if (!response.ok) throw Error(data.detail || "上传失败"); await loadAdmin(); alert(`上传成功：${data.filename}`); } catch (error) { alert(error.message); } }; input.click(); } catch (error) { alert(error.message); } }
 async function grant(userId, courses) { const choice = prompt(`输入课程 ID：\n${courses.map((course) => `${course.id}：${course.title}`).join("\n")}`); if (!choice) return; try { await api("/api/admin/enrollments", {method: "POST", body: JSON.stringify({user_id: userId, course_id: Number(choice)})}); alert("已开通课程"); } catch (error) { alert(error.message); } }
+
+async function bootCourseCreate() {
+  if (!(await authenticatedPage())) return;
+  if (me.role === "student") { location.href = "/static/home.html"; return; }
+  const form = document.querySelector("#create-course-form");
+  const message = document.querySelector("#create-course-message");
+  form.onsubmit = async (event) => {
+    event.preventDefault();
+    const button = form.querySelector("button[type=submit]");
+    const payload = Object.fromEntries(new FormData(form));
+    message.textContent = "";
+    button.disabled = true;
+    button.textContent = "正在创建…";
+    try {
+      const course = await api("/api/admin/courses", {method: "POST", body: JSON.stringify(payload)});
+      location.href = `/static/course-editor.html?id=${course.id}`;
+    } catch (error) {
+      message.textContent = error.message;
+      button.disabled = false;
+      button.textContent = "创建并编辑课程内容";
+    }
+  };
+}
 
 async function bootEditor() {
   if (!(await authenticatedPage())) return;
@@ -112,8 +133,8 @@ async function bootEditor() {
   let selectedDuration = 0;
   const loadEditor = async () => {
     activeCourse = await api(`/api/courses/${courseId}`);
-    document.querySelector("#editor-title").textContent = activeCourse.title;
-    document.querySelector("#editor-description").textContent = activeCourse.description;
+    document.querySelector("#editor-title").value = activeCourse.title;
+    document.querySelector("#editor-description").value = activeCourse.description;
     document.querySelector("#editor-chapters").innerHTML = activeCourse.chapters.length ? activeCourse.chapters.map((chapter, index) => `<div class="chapter"><b>${esc(chapterLabel(chapter, index + 1))}</b> <button class="link-button" data-edit-chapter="${chapter.id}">修改</button> <button class="link-button" data-delete-chapter="${chapter.id}">删除</button>${chapter.lessons.length ? chapter.lessons.map((lesson) => `<div class="lesson"><span>${esc(lesson.title)} ${lesson.is_preview ? "（试听）" : ""}</span><small>${lesson.duration ? `${Math.ceil(lesson.duration / 60)} 分钟` : "待上传视频"} ${lesson.original_filename ? "· 已上传" : ""}　<button class="link-button" data-edit-lesson="${lesson.id}">修改</button> <button class="link-button" data-delete-lesson="${lesson.id}">删除</button></small></div>`).join("") : '<p class="muted">暂无课时</p>'}</div>`).join("") : '<p class="muted">还没有章节，请先在右侧创建。</p>';
     document.querySelector("#chapter-select").innerHTML = activeCourse.chapters.map((chapter, index) => `<option value="${chapter.id}">${esc(chapterLabel(chapter, index + 1))}</option>`).join("");
     document.querySelectorAll("[data-edit-chapter]").forEach((node) => node.onclick = () => editChapter(Number(node.dataset.editChapter)));
@@ -129,6 +150,28 @@ async function bootEditor() {
   const deleteChapter = async (id) => { if (!confirm("删除章节会同时删除其中所有课时和视频，确认继续吗？")) return; try { await api(`/api/admin/chapters/${id}`, {method: "DELETE"}); await loadEditor(); } catch (error) { alert(error.message); } };
   const editLesson = async (id) => { const lesson = findLesson(id); const title = prompt("课时名称：", lesson.title); if (title === null) return; try { await api(`/api/admin/lessons/${id}`, {method: "PATCH", body: JSON.stringify({title, is_preview: confirm("允许未授权学员试听？")})}); await loadEditor(); } catch (error) { alert(error.message); } };
   const deleteLesson = async (id) => { if (!confirm("确认删除该课时及其上传视频吗？")) return; try { await api(`/api/admin/lessons/${id}`, {method: "DELETE"}); await loadEditor(); } catch (error) { alert(error.message); } };
+  document.querySelector("#course-form").onsubmit = async (event) => {
+    event.preventDefault();
+    const formElement = event.currentTarget;
+    const button = formElement.querySelector("button[type=submit]");
+    const message = document.querySelector("#course-save-message");
+    const payload = Object.fromEntries(new FormData(formElement));
+    message.className = "form-message";
+    message.textContent = "";
+    button.disabled = true;
+    button.textContent = "保存中…";
+    try {
+      await api(`/api/admin/courses/${courseId}`, {method: "PATCH", body: JSON.stringify(payload)});
+      await loadEditor();
+      message.textContent = "课程基本信息已保存";
+    } catch (error) {
+      message.className = "form-message error";
+      message.textContent = error.message;
+    } finally {
+      button.disabled = false;
+      button.textContent = "保存基本信息";
+    }
+  };
   document.querySelector("#chapter-form").onsubmit = async (event) => { event.preventDefault(); const formElement = event.currentTarget; const title = new FormData(formElement).get("title"); try { await api(`/api/admin/courses/${courseId}/chapters`, {method: "POST", body: JSON.stringify({title})}); formElement.reset(); await loadEditor(); } catch (error) { alert(error.message); } };
   document.querySelector("#lesson-form").onsubmit = async (event) => { event.preventDefault(); const formElement = event.currentTarget; const form = new FormData(formElement), file = form.get("video"); if (!selectedDuration) return alert("请等待系统读取视频实际时长后再提交"); try { const lesson = await api(`/api/admin/chapters/${form.get("chapter_id")}/lessons`, {method: "POST", body: JSON.stringify({title: form.get("title"), is_preview: form.get("is_preview") === "on"})}); const upload = new FormData(); upload.append("file", file); upload.append("duration", String(selectedDuration)); const response = await fetch(`/api/admin/lessons/${lesson.id}/video`, {method: "POST", headers: {Authorization: `Bearer ${token}`}, body: upload}); const data = await response.json(); if (!response.ok) throw Error(data.detail || "视频上传失败"); selectedDuration = 0; formElement.reset(); document.querySelector("#video-meta").textContent = "上传成功，时长已按视频元数据写入。"; await loadEditor(); } catch (error) { alert(error.message); } };
   await loadEditor();
@@ -143,4 +186,4 @@ function bootAuth() {
   if (token) location.href = "/static/home.html";
 }
 
-document.addEventListener("DOMContentLoaded", () => ({home: bootHome, mine: bootMine, course: bootCourse, admin: bootAdmin, editor: bootEditor}[document.body.dataset.page] || bootAuth)());
+document.addEventListener("DOMContentLoaded", () => ({home: bootHome, mine: bootMine, course: bootCourse, admin: bootAdmin, "course-create": bootCourseCreate, editor: bootEditor}[document.body.dataset.page] || bootAuth)());

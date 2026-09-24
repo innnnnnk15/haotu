@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>新建课程 - 猴子课堂</title>
+  <link rel="stylesheet" href="/static/styles.css">
+</head>
+<body data-page="course-create">
+  <header class="top">
+    <div class="shell">
+      <div class="brand">猴子 <span>课堂</span></div>
+      <nav class="nav">
+        <a href="/static/home.html">首页</a>
+        <a href="/static/my-courses.html">我的课程</a>
+        <a class="active" data-admin href="/static/admin.html">管理后台</a>
+        <span data-user class="user"></span>
+        <button data-logout>退出</button>
+      </nav>
+    </div>
+  </header>
+  <main class="shell main form-page">
+    <a class="link-button back" href="/static/admin.html">← 返回管理后台</a>
+    <form id="create-course-form" class="panel form-panel">
+      <div class="form-heading">
+        <span class="tag">课程管理</span>
+        <h1>新建课程</h1>
+        <p class="muted">填写基本资料后创建课程，再继续添加章节和课时。</p>
+      </div>
+      <label>课程名称<input name="title" maxlength="200" required autofocus placeholder="例如：Python Web 开发入门"></label>
+      <label>课程介绍<textarea name="description" rows="5" required placeholder="简要说明课程内容、适合人群与学习收获"></textarea></label>
+      <div class="form-grid">
+        <label>讲师<input name="teacher" maxlength="100" required value="平台讲师"></label>
+        <label>课程分类<input name="category" maxlength="100" required value="未分类" placeholder="例如：编程开发"></label>
+      </div>
+      <p id="create-course-message" class="form-message error" aria-live="polite"></p>
+      <div class="form-actions">
+        <a class="secondary" href="/static/admin.html">取消</a>
+        <button class="primary" type="submit">创建并编辑课程内容</button>
+      </div>
+    </form>
+  </main>
+  <script src="/static/app.js"></script>
+</body>
+</html>

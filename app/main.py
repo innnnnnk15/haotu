@@ -238,6 +238,11 @@ class CoursePayload(BaseModel):
     category: str = "未分类"
 
 
+class CourseUpdatePayload(BaseModel):
+    title: str
+    description: str
+
+
 class EnrollmentPayload(BaseModel):
     user_id: int
     course_id: int
@@ -445,8 +450,39 @@ def admin_courses(_: dict = Depends(require_admin)) -> list[dict]:
 
 @app.post("/api/admin/courses", tags=["管理后台"])
 def create_course(payload: CoursePayload, _: dict = Depends(require_admin)) -> dict:
-    conn = db(); cursor = conn.execute("INSERT INTO courses(title,description,teacher,category,cover,created_at) VALUES (?,?,?,?,?,?)", (payload.title, payload.description, payload.teacher, payload.category, "#7c3aed", now())); conn.commit()
+    title = payload.title.strip()
+    description = payload.description.strip()
+    teacher = payload.teacher.strip()
+    category = payload.category.strip()
+    if not title or len(title) > 200:
+        raise HTTPException(422, "课程名称须为 1 至 200 个字符")
+    if not description:
+        raise HTTPException(422, "课程介绍不能为空")
+    if not teacher or len(teacher) > 100:
+        raise HTTPException(422, "讲师名称须为 1 至 100 个字符")
+    if not category or len(category) > 100:
+        raise HTTPException(422, "课程分类须为 1 至 100 个字符")
+    conn = db(); cursor = conn.execute("INSERT INTO courses(title,description,teacher,category,cover,created_at) VALUES (?,?,?,?,?,?)", (title, description, teacher, category, "#7c3aed", now())); conn.commit()
     row = conn.execute("SELECT * FROM courses WHERE id=?", (cursor.lastrowid,)).fetchone(); conn.close()
+    return dict(row)
+
+
+@app.patch("/api/admin/courses/{course_id}", tags=["管理后台"])
+def update_course(course_id: int, payload: CourseUpdatePayload, _: dict = Depends(require_admin)) -> dict:
+    title = payload.title.strip()
+    description = payload.description.strip()
+    if not title or len(title) > 200:
+        raise HTTPException(422, "课程名称须为 1 至 200 个字符")
+    if not description:
+        raise HTTPException(422, "课程介绍不能为空")
+    conn = db()
+    if not conn.execute("SELECT 1 FROM courses WHERE id=?", (course_id,)).fetchone():
+        conn.close()
+        raise HTTPException(404, "课程不存在")
+    conn.execute("UPDATE courses SET title=?, description=? WHERE id=?", (title, description, course_id))
+    conn.commit()
+    row = conn.execute("SELECT * FROM courses WHERE id=?", (course_id,)).fetchone()
+    conn.close()
     return dict(row)
 
 
