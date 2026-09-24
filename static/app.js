@@ -135,6 +135,7 @@ async function bootEditor() {
     activeCourse = await api(`/api/courses/${courseId}`);
     document.querySelector("#editor-title").value = activeCourse.title;
     document.querySelector("#editor-description").value = activeCourse.description;
+    document.querySelector("#editor-category").value = activeCourse.category;
     document.querySelector("#editor-chapters").innerHTML = activeCourse.chapters.length ? activeCourse.chapters.map((chapter, index) => `<div class="chapter"><b>${esc(chapterLabel(chapter, index + 1))}</b> <button class="link-button" data-edit-chapter="${chapter.id}">修改</button> <button class="link-button" data-delete-chapter="${chapter.id}">删除</button>${chapter.lessons.length ? chapter.lessons.map((lesson) => `<div class="lesson"><span>${esc(lesson.title)} ${lesson.is_preview ? "（试听）" : ""}</span><small>${lesson.duration ? `${Math.ceil(lesson.duration / 60)} 分钟` : "待上传视频"} ${lesson.original_filename ? "· 已上传" : ""}　<button class="link-button" data-edit-lesson="${lesson.id}">修改</button> <button class="link-button" data-delete-lesson="${lesson.id}">删除</button></small></div>`).join("") : '<p class="muted">暂无课时</p>'}</div>`).join("") : '<p class="muted">还没有章节，请先在右侧创建。</p>';
     document.querySelector("#chapter-select").innerHTML = activeCourse.chapters.map((chapter, index) => `<option value="${chapter.id}">${esc(chapterLabel(chapter, index + 1))}</option>`).join("");
     document.querySelectorAll("[data-edit-chapter]").forEach((node) => node.onclick = () => editChapter(Number(node.dataset.editChapter)));

@@ -241,6 +241,7 @@ class CoursePayload(BaseModel):
 class CourseUpdatePayload(BaseModel):
     title: str
     description: str
+    category: str
 
 
 class EnrollmentPayload(BaseModel):
@@ -471,15 +472,18 @@ def create_course(payload: CoursePayload, _: dict = Depends(require_admin)) -> d
 def update_course(course_id: int, payload: CourseUpdatePayload, _: dict = Depends(require_admin)) -> dict:
     title = payload.title.strip()
     description = payload.description.strip()
+    category = payload.category.strip()
     if not title or len(title) > 200:
         raise HTTPException(422, "课程名称须为 1 至 200 个字符")
     if not description:
         raise HTTPException(422, "课程介绍不能为空")
+    if not category or len(category) > 100:
+        raise HTTPException(422, "课程分类须为 1 至 100 个字符")
     conn = db()
     if not conn.execute("SELECT 1 FROM courses WHERE id=?", (course_id,)).fetchone():
         conn.close()
         raise HTTPException(404, "课程不存在")
-    conn.execute("UPDATE courses SET title=?, description=? WHERE id=?", (title, description, course_id))
+    conn.execute("UPDATE courses SET title=?, description=?, category=? WHERE id=?", (title, description, category, course_id))
     conn.commit()
     row = conn.execute("SELECT * FROM courses WHERE id=?", (course_id,)).fetchone()
     conn.close()

@@ -38,6 +38,7 @@ class FakeDatabase:
         if sql.startswith("UPDATE courses"):
             self.course["title"] = params[0]
             self.course["description"] = params[1]
+            self.course["category"] = params[2]
             self.last_write = (sql, params)
             return Cursor()
         if sql.startswith("SELECT * FROM courses"):
@@ -73,10 +74,11 @@ class CourseManagementTests(unittest.TestCase):
         database = FakeDatabase({"id": 7, "title": "旧名称", "description": "旧介绍"})
 
         with patch("app.main.db", return_value=database):
-            result = update_course(7, CourseUpdatePayload(title="新名称", description="新介绍"), {"role": "admin"})
+            result = update_course(7, CourseUpdatePayload(title="新名称", description="新介绍", category="数据科学"), {"role": "admin"})
 
         self.assertEqual(result["title"], "新名称")
         self.assertEqual(result["description"], "新介绍")
+        self.assertEqual(result["category"], "数据科学")
         self.assertTrue(database.committed)
 
     def test_update_course_rejects_missing_course(self):
@@ -84,7 +86,7 @@ class CourseManagementTests(unittest.TestCase):
 
         with patch("app.main.db", return_value=database):
             with self.assertRaises(HTTPException) as raised:
-                update_course(999, CourseUpdatePayload(title="新名称", description="新介绍"), {"role": "admin"})
+                update_course(999, CourseUpdatePayload(title="新名称", description="新介绍", category="编程开发"), {"role": "admin"})
 
         self.assertEqual(raised.exception.status_code, 404)
         self.assertTrue(database.closed)

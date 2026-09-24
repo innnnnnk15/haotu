@@ -31,7 +31,7 @@
       <label>课程介绍<textarea name="description" rows="5" required placeholder="简要说明课程内容、适合人群与学习收获"></textarea></label>
       <div class="form-grid">
         <label>讲师<input name="teacher" maxlength="100" required value="平台讲师"></label>
-        <label>课程分类<input name="category" maxlength="100" required value="未分类" placeholder="例如：编程开发"></label>
+        <label>课程分类<input name="category" maxlength="100" required list="course-categories" placeholder="请选择或输入课程分类"><datalist id="course-categories"><option value="编程开发"><option value="数据科学"><option value="产品设计"><option value="职场技能"><option value="通识成长"></datalist></label>
       </div>
       <p id="create-course-message" class="form-message error" aria-live="polite"></p>
       <div class="form-actions">
